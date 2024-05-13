@@ -1,2 +1,104 @@
 # Loan-Calculator
-The Python script functions include gathering user input for loan details, calculating EMI, comparing payments with prepayments, generating payment schedules, and presenting comprehensive loan repayment scenarios to users.
+import pandas as pd
+from datetime import datetime, timedelta
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.express as px
+
+# Placeholder for machine learning model integration
+# Replace this with your actual machine learning model and prediction logic
+
+# Function to collect user inputs for loan details
+def get_user_input():
+    loan_amount = float(input("Enter the Loan Amount: ₹"))
+    interest_rate = float(input("Enter the Interest Rate (%): "))
+    term_length_years = int(input("Enter the Term Length (in Years): "))
+    first_payment_date = datetime.strptime(input("Enter the First Payment Date (DD/MM/YYYY): "), "%d/%m/%Y")
+    prepayment_amount = float(input("Enter the Prepayment Amount: ₹"))
+    additional_annual_prepayment = float(input("Enter the Additional Annual Prepayment: ₹"))
+    
+    return {
+        'loan_amount': loan_amount,
+        'interest_rate': interest_rate,
+        'term_length_years': term_length_years,
+        'first_payment_date': first_payment_date,
+        'prepayment_amount': prepayment_amount,
+        'additional_annual_prepayment': additional_annual_prepayment
+    }
+
+# Function to calculate the EMI and total payments with and without prepayments
+def calculate_emi(loan_amount, interest_rate, term_length_years, prepayment_amount=None, additional_annual_prepayment=None):
+    interest_rate_decimal = interest_rate / 100 / 12
+    monthly_payment = (loan_amount * interest_rate_decimal * (1 + interest_rate_decimal) ** term_length_years) / ((1 + interest_rate_decimal) ** term_length_years - 1)
+    total_payments_no_prepay = term_length_years * 12
+    total_interest_no_prepay = (loan_amount * interest_rate_decimal * (1 + interest_rate_decimal) ** term_length_years) / ((1 + interest_rate_decimal) ** term_length_years - 1) - loan_amount
+    if prepayment_amount:
+        total_payments_with_prepay = total_payments_no_prepay + prepayment_amount // 12
+        total_interest_with_prepay = total_payments_no_prepay * interest_rate_decimal - loan_amount
+        interest_saved = total_interest_no_prepay - total_interest_with_prepay
+    else:
+        total_payments_with_prepay = total_payments_no_prepay
+        total_interest_with_prepay = total_interest_no_prepay
+        interest_saved = 0
+    
+    return {
+        'monthly_payment': monthly_payment,
+        'total_payments_no_prepay': total_payments_no_prepay,
+        'total_interest_no_prepay': total_interest_no_prepay,
+        'total_payments_with_prepay': total_payments_with_prepay,
+        'total_interest_with_prepay': total_interest_with_prepay,
+        'interest_saved': interest_saved
+    }
+
+# Function to generate a detailed payment schedule with and without prepayments
+def generate_payment_schedule(loan_amount, interest_rate, term_length_years, prepayment_amount=None, additional_annual_prepayment=None, first_payment_date=None):
+    schedule = []
+    for i in range(term_length_years * 12):
+        interest_due = loan_amount * interest_rate / 100 / 12
+        payment_due = (loan_amount * interest_rate / 100 / 12 * (1 + interest_rate / 100 / 12) ** (term_length_years * 12)) / ((1 + interest_rate / 100 / 12) ** (term_length_years * 12) - 1)
+        if prepayment_amount and i % 12 == 0:
+            extra_payment = prepayment_amount / 12
+            loan_amount -= extra_payment
+            prepayment_amount -= extra_payment
+        else:
+            extra_payment = 0
+        principal_paid = payment_due - interest_due - extra_payment
+        loan_amount -= principal_paid
+        schedule.append({
+            'No.': i + 1,
+            'Date': (first_payment_date + timedelta(days=i*30)).strftime('%d/%m/%Y'),
+            'Interest Due': interest_due,
+            'Payment Due': payment_due,
+            'Extra Payments': extra_payment,
+            'Principal Paid': principal_paid,
+            'Balance': loan_amount
+        })
+    return schedule
+
+# Main execution flow
+def main():
+    while True:
+        user_input = get_user_input()
+        print("\nReview Your Inputs:")
+        for key, value in user_input.items():
+            print(f"{key}: {value}")
+        proceed = input("\nDo you want to proceed with these inputs? (yes/no): ").lower()
+        if proceed == "yes":
+            break
+        else:
+            print("Please correct your inputs and press Enter to continue.")
+    
+    emi_calculations = calculate_emi(user_input['loan_amount'], user_input['interest_rate'], user_input['term_length_years'], user_input['prepayment_amount'], user_input['additional_annual_prepayment'])
+    print("\nEMI Calculations:")
+    for key, value in emi_calculations.items():
+        print(f"{key}: {value}")
+    
+    payment_schedule = generate_payment_schedule(user_input['loan_amount'], user_input['interest_rate'], user_input['term_length_years'], user_input['prepayment_amount'], user_input['additional_annual_prepayment'], user_input['first_payment_date'])
+    df = pd.DataFrame.from_dict(payment_schedule)
+    print("\nPayment Schedule (With Prepayments):")
+    print(df)
+
+if __name__ == "__main__":
+    main()
